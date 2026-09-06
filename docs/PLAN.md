@@ -86,7 +86,7 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 |---|---|---|
 | MCU | **Bare RP2040 (QFN-56) on a shared controller module** | One module design, used on *both* halves — see §4 and §5. 30 GPIO, one assembled design, one board to respin. |
 | Round display | **GC9A01 1.28" 240×240 SPI** | Confirmed in QMK Quantum Painter (`qp_gc9a01_make_spi_device`). Note: it's a round *LCD*, not an OLED — genuine round OLEDs have no QMK driver. If you insist on OLED, that becomes a driver-writing subproject. |
-| Trackpad | **Cirque Pinnacle TM035035** (35 mm) | Use **`cirque_pinnacle_spi`, not I²C** — see §5, it lets one knob connector pinout serve both variants. 23 mm variant exists if the right ring gets too large. |
+| Trackpad | **Cirque Pinnacle TM035035** (35 mm) | QMK **`cirque_pinnacle_i2c`** — the well-trodden path, 3 wires, and open-drain edges tolerate a ribbon better than fast SPI. 23 mm variant exists if the right ring gets too large. |
 | Encoder | EC11 with detents, off-axis | Plus a separate ring push? Deferred — pressing a ring is mechanically awkward; put the encoder switch on a dedicated key instead. |
 | Switches | MX-compatible, Kailh hot-swap sockets | |
 | Diodes | 1N4148W SOD-123, one per key, column→row | |
@@ -115,7 +115,7 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 | BOOTSEL | Momentary to QSPI_SS through 1 kΩ | **Non-optional.** Without it an unflashed board is a brick until you short pads with tweezers. |
 | RESET | Momentary shorting RUN to GND | Pair with `RP2040_BOOTLOADER_DOUBLE_TAP_RESET` |
 | Power OR-ing | Schottky or ideal-diode between USB VBUS and the TRRS 5 V line | Both halves have USB-C; stop one half back-feeding the other |
-| Connectors | 16-pin FFC to the main PCB, 12-pin FFC to the knob module | See §5 for the pinouts |
+| Connectors | 16-pin FFC to the main PCB, 14-pin FFC to the knob module | See §5 for the pinouts |
 
 ### Board-level consequences
 
@@ -179,16 +179,18 @@ What this buys, versus putting the RP2040 on each main PCB:
 
 The cost is one extra board-to-board cable per half, and display SPI now crossing a ribbon rather than running point-to-point. Both are covered below.
 
-### Why the Cirque runs on SPI, not I²C
+### Both buses on one knob connector
 
-So that **one knob-connector pinout serves both variants**. On I²C the two variants would need different signals on the same physical pins, and RP2040's fixed function map makes that awkward. On SPI they share a bus:
+The GC9A01 is SPI-only and the Cirque is happiest on I²C, so the controller carries **both buses natively** — SPI on RP2040's SPI pins, I²C on its I²C pins. No pin doing double duty, no function-map gymnastics, no PIO fallback, and each signal means exactly one thing when you are debugging it at 1 a.m.
 
-| Variant | Uses |
-|---|---|
-| GC9A01 display | SCK, MOSI, CS, + D0 as DC, D1 as RST, D2 as backlight |
-| Cirque (`cirque_pinnacle_spi`) | SCK, MOSI, MISO, CS, + D0 as data-ready |
+Both buses share **one** 14-pin connector rather than getting a header each. Two headers would leave a dead connector on every board — the display variant never populates I²C, the Cirque variant never populates SPI — for no gain over letting the unused lines idle in a single cable. One connector is also one cable part number and no way to plug into the wrong header.
 
-One connector, one cable part number, two populations.
+| Variant | Uses | Idle |
+|---|---|---|
+| GC9A01 display | SCK, MOSI, CS, DC, RST, BL | SDA, SCL, DR |
+| Cirque, `cirque_pinnacle_i2c` | SDA, SCL, DR | the six SPI lines |
+
+Keeping the Cirque on I²C also drops **MISO** from the design entirely — nothing else on the knob module talks back over SPI.
 
 ### Interfaces
 
@@ -202,9 +204,17 @@ One connector, one cable part number, two populations.
 
 Handedness moves to the *main* PCB precisely because the controller is now identical on both sides. It stays hardwired, so there is still nothing to jumper and nothing to lose on an EEPROM reset.
 
-**Controller → knob module, 12-pin FFC.** SCK, MOSI, MISO, CS, D0, D1, D2, ENC_A, ENC_B, 3V3, GND, and one spare.
+**Controller → knob module, 14-pin FFC.** Both buses, plus the encoder:
 
-**Ribbon-borne SPI** is the one real regression. Mitigate it: keep the cable short, use an FFC with ground returns between signals, and clock Quantum Painter conservatively — the GC9A01 is a 240×240 status display, not a video target. Confirm the achievable clock in Phase 1 over a representative cable, not on a breadboard jumper.
+| Lines | |
+|---|---|
+| 6 | display SPI — SCK, MOSI, CS, DC, RST, BL |
+| 3 | Cirque I²C — SDA, SCL, DR |
+| 2 | encoder A, B |
+| 2 | 3V3, GND |
+| 1 | spare |
+
+**Ribbon-borne SPI** is the one real regression, and it applies to the display only — the Cirque's I²C is undemanding at 400 kHz. Mitigate it: keep the cable short, use an FFC with ground returns between signals, and clock Quantum Painter conservatively — the GC9A01 is a 240×240 status display, not a video target. Confirm the achievable clock in Phase 1 over a representative cable, not on a breadboard jumper.
 
 ### Pin budget — one controller must satisfy both halves
 
@@ -213,12 +223,12 @@ Because the module is shared, it has to carry the union of what either side need
 | | Pins |
 |---|---|
 | Matrix (5 rows + 8 columns) | 13 |
-| Knob connector signals (SCK, MOSI, MISO, CS, D0, D1, D2, ENC_A, ENC_B) | 9 |
+| Knob connector signals (6 SPI + 3 I²C + 2 encoder) | 11 |
 | Split serial | 1 |
 | Handedness (read from the main PCB) | 1 |
-| **Total** | **24** |
+| **Total** | **26** |
 
-A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI sit on dedicated pins and cost nothing. **Six spare** — enough for per-key RGB or a second encoder later. Verify against real hardware in Phase 1 before layout.
+A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI sit on dedicated pins and cost nothing. **Four spare** — still room for per-key RGB or a second encoder later. Verify against real hardware in Phase 1 before layout.
 
 ### Split topology — two MCUs, and why it isn't a preference
 
@@ -297,7 +307,7 @@ Build guide, BOM with part numbers, STLs, upstream the QMK keyboard definition i
 | Risk | Impact | Mitigation |
 |---|---|---|
 | RP2040 module fails to enumerate | ~1 week, ~$15 | Minimal-design-example diff + the §4 checklist; the module is ordered alone and proven in Phase 4.5 before any main PCB is ordered |
-| Display SPI unreliable over the FFC | Glitchy or blank display | Short cable, ground returns between signals, conservative QP clock; qualify over a real cable in Phase 1, not a breadboard jumper |
+| Display SPI unreliable over the FFC | Glitchy or blank display | Short cable, ground returns between signals, conservative QP clock; qualify over a real cable in Phase 1, not a breadboard jumper. The Cirque is unaffected — I²C at 400 kHz over a ribbon is undemanding. |
 | Two board-to-board cables per half | More connectors to fail | Locking FFC connectors, strain relief designed into the case, spare cables ordered |
 | Hand-soldering the QFN-56 goes wrong | Dead board | Don't — JLCPCB PCBA the MCU side |
 | Matrix routing fragments the ground pour under the MCU | Flaky, hard-to-debug behaviour | Much easier now: the controller is a small dedicated board with no matrix on it at all. Keep its pour continuous and stitch the centre pad. |
