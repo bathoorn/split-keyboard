@@ -90,6 +90,7 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 | Encoder | EC11 with detents, off-axis | Plus a separate ring push? Deferred — pressing a ring is mechanically awkward; put the encoder switch on a dedicated key instead. |
 | Switches | MX-compatible, Kailh hot-swap sockets | |
 | Diodes | 1N4148W SOD-123, one per key, column→row | |
+| Per-key RGB | **SK6812MINI-E, reserved not committed** | Footprints on the mains from day one, populated later or never. Data pin, 5 V rail and ground return reserved on the main FFC — see §5. |
 | Split link | TRRS, with ESD protection and series resistors | USB-C-to-USB-C split cables risk shorting VBUS into a host. Not worth it. |
 | USB | USB-C on **both** halves | |
 
@@ -194,13 +195,16 @@ Keeping the Cirque on I²C also drops **MISO** from the design entirely — noth
 
 ### Interfaces
 
-**Controller → main PCB, 16-pin FFC.** Matrix plus handedness plus power:
+**Controller → main PCB, 20-pin FFC.** Matrix, handedness, and the reserved RGB provision:
 
 | Lines | |
 |---|---|
 | 13 | matrix — 5 rows + 8 columns (left uses 7 columns and leaves one idle) |
 | 1 | handedness — pulled to 3V3 on the left main PCB, to GND on the right |
-| 2 | 3V3, GND |
+| 1 | RGB data (reserved) |
+| 1 | 3V3 — handedness reference only, negligible current |
+| 2 | 5 V — doubled; a 0.5 mm-pitch FFC conductor is good for roughly half an amp |
+| 2 | GND — doubled, as the LED return path |
 
 Handedness moves to the *main* PCB precisely because the controller is now identical on both sides. It stays hardwired, so there is still nothing to jumper and nothing to lose on an EEPROM reset.
 
@@ -226,9 +230,28 @@ Because the module is shared, it has to carry the union of what either side need
 | Knob connector signals (6 SPI + 3 I²C + 2 encoder) | 11 |
 | Split serial | 1 |
 | Handedness (read from the main PCB) | 1 |
-| **Total** | **26** |
+| Per-key RGB data (reserved) | 1 |
+| **Total** | **27** |
 
-A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI sit on dedicated pins and cost nothing. **Four spare** — still room for per-key RGB or a second encoder later. Verify against real hardware in Phase 1 before layout.
+A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI sit on dedicated pins and cost nothing. **Three spare** — room for a second encoder or a status LED later. Verify against real hardware in Phase 1 before layout.
+
+### Per-key RGB — reserved, not committed
+
+The intent is to keep the option open without paying for it now. Reserving it properly means three things, only one of which is a pin.
+
+**1. The pin.** One GPIO for WS2812 data, carried to the mains over the FFC. On RP2040 QMK drives this from PIO, so any GPIO works.
+
+**2. The rail.** SK6812MINI-E are 5 V parts. At full white they pull ~60 mA each — 69 of them would be over 4 A, which is absurd against a 500 mA USB budget, so brightness gets capped in firmware regardless (`RGB_MATRIX_MAXIMUM_BRIGHTNESS`, realistically 50–80 of 255). Even at 20% that is ~0.8 A across both halves. Consequences:
+
+- LEDs hang off **VBUS, never the 3V3 LDO**. Sizing the LDO for them would be a mistake.
+- The main FFC gets doubled 5 V and ground conductors.
+- If one USB port feeds both halves, that current crosses the **TRRS link**. Common practice, but it is the constraint that sets your real brightness ceiling — measure it in Phase 1 rather than trusting a number here.
+
+**3. Level shifting.** RP2040 drives 3.3 V logic into a 5 V-powered LED chain. That usually works and often doesn't, and a ribbon makes it more marginal. Put a 74AHCT125 (or equivalent) footprint on the controller and leave it unpopulated with a 0 Ω bypass link — a few cents of copper against a class of bug that is genuinely unpleasant to chase.
+
+**What actually has to happen at Phase 3:** put the SK6812MINI-E footprints on both main PCBs. Unpopulated footprints cost nothing at fab; adding them later is a respin of both mains. The pin, the rail and the shifter are all retrofittable — the footprints are not, and that's the decision this reservation is really about.
+
+If it does get built: `RGB_MATRIX_ENABLE = yes`, `WS2812_DRIVER = vendor` (RP2040 PIO), `#define WS2812_DI_PIN GPxx`, and `RGB_MATRIX_SPLIT { 32, 37 }` for the asymmetric halves.
 
 ### Split topology — two MCUs, and why it isn't a preference
 
@@ -309,6 +332,8 @@ Build guide, BOM with part numbers, STLs, upstream the QMK keyboard definition i
 | RP2040 module fails to enumerate | ~1 week, ~$15 | Minimal-design-example diff + the §4 checklist; the module is ordered alone and proven in Phase 4.5 before any main PCB is ordered |
 | Display SPI unreliable over the FFC | Glitchy or blank display | Short cable, ground returns between signals, conservative QP clock; qualify over a real cable in Phase 1, not a breadboard jumper. The Cirque is unaffected — I²C at 400 kHz over a ribbon is undemanding. |
 | Two board-to-board cables per half | More connectors to fail | Locking FFC connectors, strain relief designed into the case, spare cables ordered |
+| RGB populated later, current exceeds budget | Brownout, flaky split link | LEDs on VBUS not the LDO; doubled 5 V/GND conductors; brightness capped in firmware; measure the real ceiling in Phase 1 |
+| 3.3 V data into 5 V LEDs proves marginal | Flicker, wrong colours, wasted debugging | 74AHCT125 footprint on the controller, unpopulated with a 0 Ω bypass |
 | Hand-soldering the QFN-56 goes wrong | Dead board | Don't — JLCPCB PCBA the MCU side |
 | Matrix routing fragments the ground pour under the MCU | Flaky, hard-to-debug behaviour | Much easier now: the controller is a small dedicated board with no matrix on it at all. Keep its pour continuous and stitch the centre pad. |
 | LDO undersized for display + RGB | Brownout under load | Size from the Phase 1 measurement, not from a datasheet guess |
@@ -350,6 +375,7 @@ split-keyboard/
 | Main PCBs, two designs ×5 each, 2-layer, **bare** | ~$70 |
 | Knob module PCBs, two variants ×10, 2-layer, bare | ~$25 |
 | FFC cables and connectors | ~$15 |
+| Per-key RGB, only if populated (69 × SK6812MINI-E) | ~$25 |
 | Switches, keycaps, sockets, diodes, encoders | ~$120 |
 | **Total, with one respin** | **~$470** |
 
