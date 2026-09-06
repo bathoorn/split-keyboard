@@ -1,0 +1,310 @@
+# Split Keyboard Project Plan
+
+**Started:** 2026-09-05
+**Deliverables:** KiCad PCB design · 3D-printed case · QMK firmware
+**Headline feature:** each half has a rotary encoder ring; the left ring surrounds a round display, the right ring surrounds a round Cirque trackpad.
+
+---
+
+## 0. Layout of record
+
+**[Hasukey both](https://www.keyboard-layout-editor.com/#/gists/79b213f0ee5e06abae0b7c78ffe1bd76)**, KLE gist `79b213f0ee5e06abae0b7c78ffe1bd76`. Sources vendored in `hardware/layout/`; rendered to scale in `docs/layout.svg`.
+
+| | |
+|---|---|
+| Total keys | 69 — **32 left, 37 right** |
+| Style | Row-staggered, 60%-derived, with arrow cluster on the right |
+| Matrix | 5×7 left (35 positions for 32 keys), 5×8 right (40 for 37) |
+| Thumb keys | 4 angled: Del +15°, Space −45° (1.5u), Enter +45° (1.5u), Bspc −15° |
+| Unlabeled keys | 3, at (7.00, 1.50), (10.50, 3.50), (1.75, 4.50) — **real switches**, legends assigned later in the keymap |
+| Knob pods | Inner edge of each half, in the alpha/thumb pocket — see below |
+
+Two consequences ripple through the rest of this plan:
+
+- **No reversible PCB** (§5). The halves are asymmetric; nothing mirrors. Silver lining: two distinct boards let handedness be hardwired rather than jumpered.
+- **Ergogen is the wrong tool.** It targets column-staggered ergo boards. With a KLE file as the source of truth, the toolchain is KLE → `adamws/kicad-kbplacer` to place switch footprints from the layout, with `kle2netlist` for the netlist. Evaluate both in Phase 0.
+
+### Knob pods
+
+The stock layout reserves no circular area, so each half grows a pod on its **inner edge**, tucked into the pocket between the last alpha key and the angled thumb key. All 69 keys survive. Positions were solved rather than eyeballed — point-to-rotated-rect clearance against that half's own keys only, minimum 5 mm, closest valid centre to the pocket:
+
+| | Centre (u) | Sensor | Ring OD | Clearances |
+|---|---|---|---|---|
+| Left — GC9A01 display | **(8.70, 4.20)** | 33 mm | ~45 mm (2.4u) | Space 5.2 mm · B 5.4 mm |
+| Right — Cirque TM035035 | **(8.40, 4.20)** | 35 mm | ~50 mm (2.6u) | thumb Enter 5.2 mm · unlabeled key 5.7 mm |
+
+Both land against exactly the keys they were meant to: B and Space on the left, thumb Enter and the unlabeled key left of N on the right.
+
+Two notes on reading the drawing. The two centres have almost the same x, which would be a collision on one board — but these are **two separate PCBs** (§5) that sit apart in use, so each pod extends into space the other never occupies. That inboard freedom is the whole reason the pods aren't outboard where they'd be a pinky reach. And 5 mm is deliberately tight: you grip the ring from its **open outer side**, so the key-side gap only has to clear the keycap, not a fingertip. Confirm that on the Phase 0 mockup before it goes into copper.
+
+Reproduce with `hardware/layout/place.py` (solver) and `hardware/layout/svg2.py` (drawing). Note `docs/layout.svg` is a **diagram, not to scale** — for anything you measure against, use the 1:1 sheets below.
+
+---
+
+## 1. The one idea that makes this buildable
+
+The requirement says "display/trackpad **on top of** the rotary encoder knob." Taken literally that means the display rotates with the knob, which needs a slip ring or a hollow shaft plus a wire loom that survives infinite rotation. Don't do that.
+
+**Invert it: the centre is static, the *ring* rotates around it.**
+
+The display and trackpad are fixed to the case. A knurled ring on the outside spins around them. Visually and ergonomically identical to a knob with a screen on top; electrically trivial, because no wire ever moves.
+
+Every mechanism option below is a way of sensing that ring's rotation.
+
+```
+        ┌──── rotating ring (finger contact) ────┐
+        │   ┌──── static bezel / keep-out ────┐  │
+        │   │   ┌──── display or Cirque ───┐  │  │
+        │   │   │      (never moves)       │  │  │
+        │   │   └──────────────────────────┘  │  │
+        │   └─────────────────────────────────┘  │
+        └────────────────────────────────────────┘
+```
+
+---
+
+## 2. Ring-encoder mechanism — options and the pick
+
+| | Mechanism | Sensor | QMK support | Cost | Risk |
+|---|---|---|---|---|---|
+| **A ✅** | Printed internal ring gear drives a pinion on a standard EC11 mounted off-axis | EC11 | Stock quadrature driver | ~$1 | Print tolerance / backlash |
+| B | Multipole ring magnet on the rotating ring, sensor read off-axis | AS5304/AS5306 (outputs A/B quadrature) | Stock quadrature driver | ~$25/side | Custom ring magnet sourcing |
+| C | COTS hollow-shaft / bore encoder, ring bonded to the shaft | Encoder | Stock quadrature driver | $30–90 | Finding a bore wide enough for the FFC, in budget |
+| D | Fallback: static bezel, no encoder on the right; use Cirque circular-scroll gesture | — | `CIRQUE_PINNACLE_CIRCULAR_SCROLL_ENABLE` | $0 | Loses a stated requirement |
+
+**Pick: Option A for v1**, with D held as the right-half escape hatch. Rationale: it needs no exotic BOM, no new firmware driver, and the EC11 supplies real mechanical detents so the ring *feels* like a knob. Gear ratio is a tuning knob — a 3:1 ring:pinion ratio turns the EC11's 20 detents/rev into 60 detents per ring revolution.
+
+An on-axis magnetic sensor (AS5600, MT6701) is the obvious-looking choice and is **wrong here** — it needs a diametric magnet centred on the axis, which is exactly where the display is.
+
+Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **Cirque caveat:** the Pinnacle is capacitive. Keep the steel bearing and any metal outside Cirque's keep-out, and verify sensitivity on the bench (Phase 2) before committing the case geometry.
+
+---
+
+## 3. Component decisions
+
+| Slot | Part | Notes |
+|---|---|---|
+| MCU | **Bare RP2040 (QFN-56) on each half** | See §4 for the full subsystem. Buys 30 GPIO instead of ~23, and a single board with no module stack-up. Costs an assembly service and some layout discipline. |
+| Round display | **GC9A01 1.28" 240×240 SPI** | Confirmed in QMK Quantum Painter (`qp_gc9a01_make_spi_device`). Note: it's a round *LCD*, not an OLED — genuine round OLEDs have no QMK driver. If you insist on OLED, that becomes a driver-writing subproject. |
+| Trackpad | **Cirque Pinnacle TM035035** (35 mm) | QMK `cirque_pinnacle_spi` / `cirque_pinnacle_i2c`. 23 mm variant also exists if the right ring gets too large. |
+| Encoder | EC11 with detents, off-axis | Plus a separate ring push? Deferred — pressing a ring is mechanically awkward; put the encoder switch on a dedicated key instead. |
+| Switches | MX-compatible, Kailh hot-swap sockets | |
+| Diodes | 1N4148W SOD-123, one per key, column→row | |
+| Split link | TRRS, with ESD protection and series resistors | USB-C-to-USB-C split cables risk shorting VBUS into a host. Not worth it. |
+| USB | USB-C on **both** halves | |
+
+**Firmware stack:** QMK, data-driven `keyboard.json`, RP2040 split over PIO full-duplex serial (`SERIAL_DRIVER = vendor`), Quantum Painter for the display, Pointing Device + split pointing sync for the Cirque.
+
+---
+
+## 4. RP2040 subsystem (on-board, per half)
+
+**RP2040, not RP2350.** QMK's compatible-microcontrollers list still names RP2040 as the only supported Raspberry Pi part. RP2350 would mean pioneering a platform port inside a keyboard project — a bad trade.
+
+**Copy, don't invent.** Raspberry Pi's *Hardware design with RP2040*, Chapter 2 "Minimal Design Example", is the reference schematic. Boards that fail to enumerate are almost always boards that deviated from it.
+
+| Block | Part | Notes |
+|---|---|---|
+| MCU | RP2040, QFN-56, 0.4 mm pitch, 7×7 mm, centre ground pad | Not hand-solderable without stencil + hot air |
+| Flash | W25Q128JVSIQ (16 MB) SOIC-8 | Headroom for Quantum Painter assets. QMK's default flash driver assumes W25Q-compatible; the `RP2040_FLASH_*` defines (`W25X10CL`, `IS25LP080`, `GD25Q64CS`, `AT25SF128A`, `GENERIC_03H`) exist only if you substitute something else. |
+| Crystal | 12 MHz fundamental, ≤30 ppm | Load caps per the crystal's own CL spec, 1 kΩ series resistor on XOUT, as on the Pico |
+| 3V3 rail | AP2112K-3.3 (600 mA), or a 1 A part | Size it from the **Phase 1 current measurement** — the GC9A01 backlight is the swing factor. Copper pour for thermals: dissipation is (5 − 3.3) × I. |
+| Decoupling | Per the minimal design example | ~10× 100 nF plus bulk. Don't economise here. |
+| USB | 27 Ω series on D+/D−, tightly coupled and length-matched pair | RP2040 is USB 1.1 **Full Speed, 12 Mbps**. Strict 90 Ω impedance control is not required at that rate. Keep the pair short and symmetric and it will work. |
+| ESD | USBLC6-2SC6 on D+/D−, and again on the TRRS lines | |
+| BOOTSEL | Momentary to QSPI_SS through 1 kΩ | **Non-optional.** Without it an unflashed board is a brick until you short pads with tweezers. |
+| RESET | Momentary shorting RUN to GND | Pair with `RP2040_BOOTLOADER_DOUBLE_TAP_RESET` |
+| Power OR-ing | Schottky or ideal-diode between USB VBUS and the TRRS 5 V line | Both halves have USB-C; stop one half back-feeding the other |
+
+### Board-level consequences
+
+- **2 layers is fine — that's what Raspberry Pi's own minimal design example uses.** The RP2040 is a peripheral-row QFN, so every pin escapes on the top layer; there is no fanout that demands inner layers. And at Full Speed USB there is no impedance requirement to satisfy. The Pico is 4-layer partly because it carries a switching buck-boost regulator — you are on a linear LDO, so that noise source doesn't exist here.
+
+  The one real tension is **ground plane integrity**: the RP2040 wants a continuous ground reference beneath it (the layout guide calls for 9 vias stitching the centre pad down), while a 5×6 matrix plus the SPI run to the knob module will happily shred a bottom-layer pour into islands. That is a routing-discipline problem, not a layer-count problem. Three rules:
+
+  1. Put the MCU block in a corner of the board and route **no** matrix traces through its ground region.
+  2. Star-route the 3V3 rail out to the supply pins rather than daisy-chaining.
+  3. Verify the bottom pour under the MCU is genuinely continuous — check the poured result, not the schematic intent.
+
+  **Go 4-layer only if** the layout ends up forcing traces across the MCU ground region. Note the cost is not trivial at this board size: 4-layer is ~+$10 at 100×100 mm, but a keyboard half is closer to 150×110 mm, where it runs several times the 2-layer price. Get a real quote for your actual outline before deciding.
+- **Assembly service for the MCU side.** JLCPCB PCBA does the RP2040, flash, crystal, LDO, USB-C and passives; you hand-solder switches, sockets, diodes, TRRS and encoders. Reflowing a 0.4 mm QFN-56 with a centre pad by hand is its own skill-acquisition project — this overturns the "no assembly service" assumption in §10.
+- **Libraries:** the RP2040 symbol ships with KiCad 9. For a vetted footprint and a layout to crib from, use the official Raspberry Pi Pico KiCad files or `ncarandini/KiCad-RP-Pico`.
+
+### Firmware deltas versus a module
+
+```make
+# rules.mk
+MCU = RP2040
+BOOTLOADER = rp2040
+BOARD = GENERIC_RP_RP2040
+SERIAL_DRIVER = vendor        # PIO — free choice of GPIO; SIO is pin-locked
+```
+```c
+// config.h
+#define RP2040_BOOTLOADER_DOUBLE_TAP_RESET
+#define RP2040_BOOTLOADER_DOUBLE_TAP_RESET_TIMEOUT 200U
+```
+`GENERIC_RP_RP2040` means every pin and driver is yours to declare — the Pro Micro RP2040 board default assumes a Sparkfun pinout that won't match yours.
+
+### MCU-section review checklist — run before ordering
+
+1. Schematic diffed block-by-block against the minimal design example.
+2. QSPI flash on the dedicated QSPI pins; BOOTSEL resistor present and 1 kΩ.
+3. Crystal load caps computed from the *chosen part's* CL, not copied blindly.
+4. Every VDD pin decoupled; centre pad stitched down with ~9 vias; bottom pour under the MCU confirmed continuous on the poured board, not just intended.
+5. USB pair short, tightly coupled, length-matched, with an unbroken ground pour beneath it — no plane split under the pair.
+6. LDO rated above the measured Phase 1 peak, with pour area for the dissipation.
+7. BOOTSEL and RESET buttons physically reachable in the assembled case.
+8. Power OR-ing verified for both "left plugged in" and "right plugged in".
+
+---
+
+## 5. PCB architecture
+
+Three board designs, not two:
+
+1. **Two distinct main PCBs — left and right.** The Hasukey layout (§0) is row-staggered and **asymmetric**: 32 keys left, 37 right, with a different shape on every row. A reversible mirrored PCB is impossible here. This is the single biggest cost of the chosen layout — two schematics, two layouts, two sets of gerbers, two PCBA setups. Panelise both designs in one JLCPCB order to claw back some of it.
+2. **Knob module: display variant.** GC9A01 + EC11 + connector.
+3. **Knob module: trackpad variant.** Cirque FFC connector + EC11 + connector.
+
+Both modules present the *same* 10-pin JST/FFC interface to the main PCB (power, ground, SPI bus, two chip selects or DC/RST, encoder A/B). This is the key move: the knob assembly is the part most likely to need three revisions, and this way you respin a $5 module instead of the whole board.
+
+### Pin budget — verify this first, it's the hard constraint
+
+| | Left | Right |
+|---|---|---|
+| Matrix (5×7 left, 5×8 right) | 12 | 13 |
+| Encoder A/B/switch | 3 | 3 |
+| Display SPI (SCK, MOSI, CS, DC, RST, BL) | 6 | — |
+| Cirque (I²C SDA/SCL + DR interrupt) | — | 3 |
+| Split serial | 1 | 1 |
+| **Total** | **22** | **20** |
+
+A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI are on dedicated pins and cost nothing from that budget. Left fits with eight to spare. Going bare turns this from the project's tightest constraint into a non-issue — spend some of the slack on per-key RGB, a second encoder, or the handedness pin below.
+
+### Split topology — two MCUs, and why it isn't a preference
+
+QMK supports both split topologies:
+
+- **Two MCUs**, one per half, talking over serial — what this plan uses.
+- **One MCU plus an I/O expander** on a passive half (the ErgoDox / MCP23018 approach).
+
+The second is off the table, and not on taste grounds: the right half needs the Cirque's I²C plus a data-ready interrupt, and the left needs six pins of SPI for the display. Piping a display's SPI bus down a TRRS cable is not a thing. **The peripherals force two MCUs.**
+
+```make
+# rules.mk
+SPLIT_KEYBOARD = yes
+SERIAL_DRIVER = vendor        # RP2040 PIO full-duplex
+```
+```c
+// config.h
+#define SPLIT_POINTING_ENABLE
+#define POINTING_DEVICE_RIGHT
+#define SPLIT_HAND_PIN GPxx           // solder jumper: high = left
+```
+
+**Decide the master half now — make it the left (display) half, and plug USB in there.** QMK's default is `MASTER_LEFT`, and everything a display wants to render (layer state, mods, WPM, caps) lives natively on the master. Putting the display on the *slave* means syncing each of those across the link (`SPLIT_LAYER_STATE_ENABLE`, `SPLIT_MODS_ENABLE`, …) and driving Quantum Painter from synced state — much less trodden ground than OLED-on-slave. The Cirque has the opposite property: it's explicitly supported on the slave via `SPLIT_POINTING_ENABLE` + `POINTING_DEVICE_RIGHT`. So with USB in the left, both peripherals sit on the half QMK makes easiest.
+
+USB-C stays on **both** halves regardless — with two MCUs you must be able to flash each independently — but left is the intended host connection.
+
+**Handedness.** Because the halves are now two distinct boards, this gets easier: hardwire `SPLIT_HAND_PIN` — tie it to 3V3 on the left PCB and to ground on the right, no jumper to set and nothing to get wrong. Avoids `EE_HANDS`, which needs a separate handedness write to each half at flash time and silently breaks after an EEPROM reset.
+
+---
+
+## 6. Phases
+
+### Phase 0 — Validate the layout physically (week 1)
+Layout and knob placement are decided (§0). What remains is proving the pod geometry with your actual hands, confirming the toolchain (`kicad-kbplacer` / `kle2netlist`), and settling the tenting angle.
+Print `docs/mockup/mockup-left-a4.pdf` and `mockup-right-a4.pdf` (Letter variants alongside). **One half per sheet, A4 landscape, at 100% / "Actual size" — not "Fit to page".** Each sheet carries a 100 mm calibration bar: measure it before trusting anything else on the page. Content is 188 × 115 mm left, 213 × 115 mm right, so no tiling is needed. Each sheet also has a cut-out disc to tape over the pod centre for height feel (the right-hand Letter sheet has no room for its disc — use the A4 version or cut it from the left sheet).
+
+Regenerate with `hardware/layout/mockup.py`, then `rsvg-convert -f pdf`.
+
+**Exit:** the two sheets spread to your real split distance, and you have put your hands on them. Check two things specifically: that the thumb reaches the Cirque without leaving home row, and that you can grip and turn the ring without catching the adjacent keycap. Cheaper to learn on paper than after a PCB spin.
+
+### Phase 1 — Electrical bring-up on dev boards (weeks 2–3)
+No custom PCB yet. Two RP2040 dev boards, breadboard, hand-wired 2×2 matrix.
+Prove, in this order: GC9A01 renders under Quantum Painter → Cirque reports pointer deltas → EC11 registers in `encoder_map` → both halves talk over TRRS → **pointing-device data crosses the split from the slave half** (`SPLIT_POINTING_ENABLE` + `POINTING_DEVICE_RIGHT`, USB in the left) → measure total current with the backlight at full brightness.
+**Exit:** one firmware binary driving every peripheral simultaneously. This phase de-risks ~80% of the project and costs about $40.
+
+### Phase 2 — Knob mechanism prototype (weeks 3–5, parallel with Phase 1)
+Print-only, no electronics beyond a loose EC11 and the Cirque. Iterate ring diameter, gear ratio, bearing fit, detent feel, and the Cirque metal keep-out.
+**Exit:** a ring you like turning, and a dimensioned sketch the PCB can be designed around.
+
+### Phase 3 — KiCad (weeks 5–9)
+KiCad 9. Symbol/footprint libraries: `ceoloide/keyboard-parts.pretty` or `marbastlib`. Schematic → main PCB layout from the Ergogen output → two knob modules → DRC → export STEP for the case.
+**Exit:** fab-ready gerbers, reviewed against the §4 MCU checklist. Budget an extra 1–2 weeks over the module route for the MCU subsystem and the ground-pour discipline it demands.
+
+### Phase 4 — Case CAD (weeks 8–10, overlapping)
+Parametric — FreeCAD, OpenSCAD, or build123d — driven by the same key positions. Two-piece tray mount, integrated or separate 1.5 mm plate, M3 heat-set inserts, tenting feet, USB-C and TRRS cutouts with real tolerance.
+**Exit:** printed test fit of the knob region and the USB-C cutout *before* ordering PCBs.
+
+### Phase 4.5 — MCU bring-up (weeks 10–11)
+Order the main PCBs with **JLCPCB assembling the MCU side only**. Before soldering a single switch: power one board, confirm it appears as `RPI-RP2` mass storage, flash a blink UF2, then flash QMK and confirm the matrix scan runs on jumpered pins. A board that doesn't enumerate here has cost you nothing but the spin.
+**Exit:** both main PCBs enumerate and accept QMK.
+
+### Phase 5 — Fab and assembly (weeks 11–13)
+Knob modules stay 2-layer and hand-soldered. Order 3× of each. Build one half completely and test before touching the second.
+
+### Phase 6 — Firmware productionization (weeks 13–15)
+Proper `keyboard.json`, QMK external userspace, Vial or VIA, QP fonts and images, encoder maps per layer, Cirque tuning (`POINTING_DEVICE_ROTATION_*`, circular scroll, tap-to-click, curved-overlay setting).
+
+### Phase 7 — Document and release (week 16)
+Build guide, BOM with part numbers, STLs, upstream the QMK keyboard definition if you want it in mainline.
+
+---
+
+## 7. Risk register
+
+| Risk | Impact | Mitigation |
+|---|---|---|
+| RP2040 board fails to enumerate | Dead spin, ~2 weeks | Minimal-design-example diff + the §4 checklist; order the MCU section assembled and bring it up standalone (Phase 4.5) before populating anything else |
+| Hand-soldering the QFN-56 goes wrong | Dead board | Don't — JLCPCB PCBA the MCU side |
+| Matrix routing fragments the ground pour under the MCU | Flaky, hard-to-debug behaviour | MCU in a corner, no matrix traces through it; inspect the poured result. Escalate to 4 layers only if this genuinely can't be met. |
+| LDO undersized for display + RGB | Brownout under load | Size from the Phase 1 measurement, not from a datasheet guess |
+| Bearing/metal detunes the Cirque | Redesign the right knob | Phase 2 bench test with the real ring |
+| Printed ring gear has too much backlash | Bad feel | Tune ratio and tooth profile in Phase 2; fallback is Option B or D |
+| Quantum Painter asset size | Won't fit | 16 MB flash specced; QP streams rather than framebuffering, so RAM is fine |
+| Case and PCB drift out of sync | Wasted fab run | Both derive from the KLE in `hardware/layout/`; print-test before ordering |
+| Knob placement forces a layout change after PCB design starts | Full respin of one or both mains | Phase 0 resolves it first, with a physical 1:1 mockup |
+
+---
+
+## 8. Repository structure
+
+```
+split-keyboard/
+├── docs/          plan, decision records, pinout, BOM, build guide
+├── hardware/
+│   ├── layout/    KLE source of truth + parser + resolved coordinates
+│   ├── pcb-left/  left main PCB (KiCad)
+│   ├── pcb-right/ right main PCB (KiCad)
+│   ├── pcb-knob-display/
+│   ├── pcb-knob-cirque/
+│   └── lib/       shared symbols + footprints
+├── case/          parametric CAD source + exported STLs
+├── firmware/      QMK external userspace
+└── proto/         Phase 1 bring-up sketches
+```
+
+---
+
+## 9. Budget
+
+| | |
+|---|---|
+| Phase 1 dev boards, GC9A01, Cirque | ~$70 |
+| Filament, bearings, hardware | ~$40 |
+| Main PCBs, **two designs** ×5 each, 2-layer, MCU side assembled by JLCPCB | ~$190 |
+| Knob module PCBs ×10, 2-layer | ~$25 |
+| Switches, keycaps, sockets, diodes, encoders | ~$120 |
+| **Total, with one respin** | **~$500** |
+
+---
+
+## 10. Assumptions I made — correct any that are wrong
+
+- Wired only. QMK, not ZMK, so no Bluetooth.
+- ~~Column-staggered ergo layout~~ — resolved: Hasukey both, see §0.
+- You have access to a 3D printer (FDM, PETG/ASA). (Yes: Voron 2.4 r2 300x300)
+- Split assembly: JLCPCB PCBA for the RP2040 subsystem, hand-soldering (0805 and through-hole) for everything you touch — switches, sockets, diodes, TRRS, encoders.
+- "Round OLED" is satisfied by a round LCD (GC9A01). See §3 if it isn't.

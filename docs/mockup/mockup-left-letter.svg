@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="279.4mm" height="215.9mm" viewBox="0 0 279.4 215.9" font-family="sans-serif">
+<rect width="279.4" height="215.9" fill="#ffffff"/>
+<text x="10.0" y="15.0" font-size="5" font-weight="bold" fill="#000">Hasukey both · LEFT half — GC9A01 display pod</text>
+<text x="10.0" y="21.5" font-size="3.4" fill="#c00" font-weight="bold">PRINT AT 100% / "Actual size". Turn OFF "Fit to page" and "Shrink oversized pages".</text>
+<text x="10.0" y="27.0" font-size="3.2" fill="#444">1u = 19.05 mm · keycap outline = 18 mm · verify with the ruler before trusting this sheet.</text>
+<rect x="10.0" y="199.9" width="100" height="4" fill="none" stroke="#000" stroke-width="0.35"/>
+<line x1="10.0" y1="199.9" x2="10.0" y2="203.9" stroke="#000" stroke-width="0.35"/>
+<line x1="20.0" y1="199.9" x2="20.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="30.0" y1="199.9" x2="30.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="40.0" y1="199.9" x2="40.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="50.0" y1="199.9" x2="50.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="60.0" y1="199.9" x2="60.0" y2="203.9" stroke="#000" stroke-width="0.35"/>
+<line x1="70.0" y1="199.9" x2="70.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="80.0" y1="199.9" x2="80.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="90.0" y1="199.9" x2="90.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="100.0" y1="199.9" x2="100.0" y2="202.1" stroke="#000" stroke-width="0.35"/>
+<line x1="110.0" y1="199.9" x2="110.0" y2="203.9" stroke="#000" stroke-width="0.35"/>
+<text x="113.0" y="203.9" font-size="3.4" font-weight="bold" fill="#000">&#8592; this bar must measure exactly 100 mm</text>
+<g><rect x="10.525" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="19.525" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">`</text></g>
+<g><rect x="29.575" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="38.575" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">1</text></g>
+<g><rect x="48.625" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="57.625" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">2</text></g>
+<g><rect x="67.675" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="76.675" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">3</text></g>
+<g><rect x="86.725" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="95.725" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">4</text></g>
+<g><rect x="105.775" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="114.775" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">5</text></g>
+<g><rect x="124.825" y="36.525" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="133.825" y="46.825" font-size="3.6" text-anchor="middle" fill="#666">6</text></g>
+<g><rect x="10.525" y="55.575" width="27.525" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="24.288" y="65.875" font-size="3.6" text-anchor="middle" fill="#666">Tab</text></g>
+<g><rect x="39.100" y="55.575" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="48.100" y="65.875" font-size="3.6" text-anchor="middle" fill="#666">Q</text></g>
+<g><rect x="58.150" y="55.575" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="67.150" y="65.875" font-size="3.6" text-anchor="middle" fill="#666">W</text></g>
+<g><rect x="77.200" y="55.575" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="86.200" y="65.875" font-size="3.6" text-anchor="middle" fill="#666">E</text></g>
+<g><rect x="96.250" y="55.575" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="105.250" y="65.875" font-size="3.6" text-anchor="middle" fill="#666">R</text></g>
+<g><rect x="115.300" y="55.575" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="124.300" y="65.875" font-size="3.6" text-anchor="middle" fill="#666">T</text></g>
+<g><rect x="134.350" y="55.575" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="143.350" y="65.875" font-size="3.6" text-anchor="middle" fill="#666"></text></g>
+<g><rect x="10.525" y="74.625" width="32.288" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="26.669" y="84.925" font-size="3.6" text-anchor="middle" fill="#666">Caps Lock</text></g>
+<g><rect x="43.862" y="74.625" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="52.862" y="84.925" font-size="3.6" text-anchor="middle" fill="#666">A</text></g>
+<g><rect x="62.913" y="74.625" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="71.912" y="84.925" font-size="3.6" text-anchor="middle" fill="#666">S</text></g>
+<g><rect x="81.963" y="74.625" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="90.963" y="84.925" font-size="3.6" text-anchor="middle" fill="#666">D</text></g>
+<g><rect x="101.013" y="74.625" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="110.013" y="84.925" font-size="3.6" text-anchor="middle" fill="#666">F</text></g>
+<g><rect x="120.063" y="74.625" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="129.062" y="84.925" font-size="3.6" text-anchor="middle" fill="#666">G</text></g>
+<g><rect x="10.525" y="93.675" width="41.813" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="31.431" y="103.975" font-size="3.6" text-anchor="middle" fill="#666">Shift</text></g>
+<g><rect x="53.388" y="93.675" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="62.388" y="103.975" font-size="3.6" text-anchor="middle" fill="#666">Z</text></g>
+<g><rect x="72.438" y="93.675" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="81.438" y="103.975" font-size="3.6" text-anchor="middle" fill="#666">X</text></g>
+<g><rect x="91.488" y="93.675" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="100.488" y="103.975" font-size="3.6" text-anchor="middle" fill="#666">C</text></g>
+<g><rect x="110.538" y="93.675" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="119.538" y="103.975" font-size="3.6" text-anchor="middle" fill="#666">V</text></g>
+<g><rect x="129.588" y="93.675" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="138.588" y="103.975" font-size="3.6" text-anchor="middle" fill="#666">B</text></g>
+<g><rect x="15.288" y="112.725" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="24.288" y="123.025" font-size="3.6" text-anchor="middle" fill="#666">Ctrl</text></g>
+<g><rect x="34.337" y="112.725" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="43.337" y="123.025" font-size="3.6" text-anchor="middle" fill="#666"></text></g>
+<g><rect x="53.388" y="112.725" width="22.762" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="64.769" y="123.025" font-size="3.6" text-anchor="middle" fill="#666">OS</text></g>
+<g><rect x="77.200" y="112.725" width="22.762" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="88.581" y="123.025" font-size="3.6" text-anchor="middle" fill="#666">Alt</text></g>
+<g transform="rotate(15 124.300 116.963)"><rect x="105.775" y="117.488" width="18.000" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="114.775" y="127.788" font-size="3.6" text-anchor="middle" fill="#666">Del</text></g>
+<g transform="rotate(-45 138.588 116.963)"><rect x="110.538" y="117.488" width="27.525" height="18.000" rx="1.2" fill="none" stroke="#000" stroke-width="0.3"/><text x="124.300" y="127.788" font-size="3.6" text-anchor="middle" fill="#666">Space</text></g>
+<circle cx="175.735" cy="116.010" r="22.500" fill="none" stroke="#c00" stroke-width="0.6"/>
+<circle cx="175.735" cy="116.010" r="16.500" fill="none" stroke="#c00" stroke-width="0.4" stroke-dasharray="2 1.5"/>
+<line x1="169.735" y1="116.010" x2="181.735" y2="116.010" stroke="#c00" stroke-width="0.3"/>
+<line x1="175.735" y1="110.010" x2="175.735" y2="122.010" stroke="#c00" stroke-width="0.3"/>
+<text x="175.735" y="91.510" font-size="3.2" text-anchor="middle" fill="#c00" font-weight="bold">ring OD 45 mm</text>
+<text x="175.735" y="142.510" font-size="3.2" text-anchor="middle" fill="#c00">sensor 33 mm (dashed)</text>
+<circle cx="244.900" cy="64.500" r="22.500" fill="none" stroke="#000" stroke-width="0.4" stroke-dasharray="3 2"/>
+<text x="244.900" y="64.500" font-size="3.2" text-anchor="middle" fill="#666">cut out</text>
+<text x="244.900" y="69.000" font-size="3.2" text-anchor="middle" fill="#666">tape on pod</text>
+</svg>
