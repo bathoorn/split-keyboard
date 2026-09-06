@@ -84,9 +84,9 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 
 | Slot | Part | Notes |
 |---|---|---|
-| MCU | **Bare RP2040 (QFN-56) on each half** | See §4 for the full subsystem. Buys 30 GPIO instead of ~23, and a single board with no module stack-up. Costs an assembly service and some layout discipline. |
+| MCU | **Bare RP2040 (QFN-56) on a shared controller module** | One module design, used on *both* halves — see §4 and §5. 30 GPIO, one assembled design, one board to respin. |
 | Round display | **GC9A01 1.28" 240×240 SPI** | Confirmed in QMK Quantum Painter (`qp_gc9a01_make_spi_device`). Note: it's a round *LCD*, not an OLED — genuine round OLEDs have no QMK driver. If you insist on OLED, that becomes a driver-writing subproject. |
-| Trackpad | **Cirque Pinnacle TM035035** (35 mm) | QMK `cirque_pinnacle_spi` / `cirque_pinnacle_i2c`. 23 mm variant also exists if the right ring gets too large. |
+| Trackpad | **Cirque Pinnacle TM035035** (35 mm) | Use **`cirque_pinnacle_spi`, not I²C** — see §5, it lets one knob connector pinout serve both variants. 23 mm variant exists if the right ring gets too large. |
 | Encoder | EC11 with detents, off-axis | Plus a separate ring push? Deferred — pressing a ring is mechanically awkward; put the encoder switch on a dedicated key instead. |
 | Switches | MX-compatible, Kailh hot-swap sockets | |
 | Diodes | 1N4148W SOD-123, one per key, column→row | |
@@ -97,7 +97,7 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 
 ---
 
-## 4. RP2040 subsystem (on-board, per half)
+## 4. RP2040 subsystem (the controller module)
 
 **RP2040, not RP2350.** QMK's compatible-microcontrollers list still names RP2040 as the only supported Raspberry Pi part. RP2350 would mean pioneering a platform port inside a keyboard project — a bad trade.
 
@@ -115,22 +115,22 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 | BOOTSEL | Momentary to QSPI_SS through 1 kΩ | **Non-optional.** Without it an unflashed board is a brick until you short pads with tweezers. |
 | RESET | Momentary shorting RUN to GND | Pair with `RP2040_BOOTLOADER_DOUBLE_TAP_RESET` |
 | Power OR-ing | Schottky or ideal-diode between USB VBUS and the TRRS 5 V line | Both halves have USB-C; stop one half back-feeding the other |
+| Connectors | 16-pin FFC to the main PCB, 12-pin FFC to the knob module | See §5 for the pinouts |
 
 ### Board-level consequences
 
 - **2 layers is fine — that's what Raspberry Pi's own minimal design example uses.** The RP2040 is a peripheral-row QFN, so every pin escapes on the top layer; there is no fanout that demands inner layers. And at Full Speed USB there is no impedance requirement to satisfy. The Pico is 4-layer partly because it carries a switching buck-boost regulator — you are on a linear LDO, so that noise source doesn't exist here.
 
-  The one real tension is **ground plane integrity**: the RP2040 wants a continuous ground reference beneath it (the layout guide calls for 9 vias stitching the centre pad down), while a 5×6 matrix plus the SPI run to the knob module will happily shred a bottom-layer pour into islands. That is a routing-discipline problem, not a layer-count problem. Three rules:
+  The remaining concern is **ground plane integrity** — the RP2040 wants a continuous reference beneath it, with ~9 vias stitching the centre pad down. Moving the MCU onto its own module makes this much easier than it was: no matrix crosses this board at all, so the pour has nothing to fragment it. Two rules still apply:
 
-  1. Put the MCU block in a corner of the board and route **no** matrix traces through its ground region.
-  2. Star-route the 3V3 rail out to the supply pins rather than daisy-chaining.
-  3. Verify the bottom pour under the MCU is genuinely continuous — check the poured result, not the schematic intent.
+  1. Star-route the 3V3 rail to the supply pins rather than daisy-chaining.
+  2. Check the *poured result*, not the schematic intent, for a continuous bottom pour under the MCU.
 
-  **Go 4-layer only if** the layout ends up forcing traces across the MCU ground region. Note the cost is not trivial at this board size: 4-layer is ~+$10 at 100×100 mm, but a keyboard half is closer to 150×110 mm, where it runs several times the 2-layer price. Get a real quote for your actual outline before deciding.
-- **Assembly service for the MCU side.** JLCPCB PCBA does the RP2040, flash, crystal, LDO, USB-C and passives; you hand-solder switches, sockets, diodes, TRRS and encoders. Reflowing a 0.4 mm QFN-56 with a centre pad by hand is its own skill-acquisition project — this overturns the "no assembly service" assumption in §10.
+  And if you ever do want 4 layers here, the module is ~40 × 30 mm, where the upgrade costs a few dollars rather than the several-times premium a full keyboard half would carry. The architecture makes that a cheap option instead of a painful one.
+- **Assembly service, for this board only.** JLCPCB PCBA populates the controller module: RP2040, flash, crystal, LDO, USB-C, ESD and FFC connectors. Everything else in the project — switches, sockets, diodes, encoders, the knob peripherals, and the through-hole TRRS jack — is hand-soldered by you. Reflowing a 0.4 mm QFN-56 with a centre pad by hand is its own skill-acquisition project; this one board is where that's worth paying to avoid, and it overturns the "no assembly service" assumption in §10.
 - **Libraries:** the RP2040 symbol ships with KiCad 9. For a vetted footprint and a layout to crib from, use the official Raspberry Pi Pico KiCad files or `ncarandini/KiCad-RP-Pico`.
 
-### Firmware deltas versus a module
+### Firmware deltas versus a stock controller board
 
 ```make
 # rules.mk
@@ -144,7 +144,7 @@ SERIAL_DRIVER = vendor        # PIO — free choice of GPIO; SIO is pin-locked
 #define RP2040_BOOTLOADER_DOUBLE_TAP_RESET
 #define RP2040_BOOTLOADER_DOUBLE_TAP_RESET_TIMEOUT 200U
 ```
-`GENERIC_RP_RP2040` means every pin and driver is yours to declare — the Pro Micro RP2040 board default assumes a Sparkfun pinout that won't match yours.
+`GENERIC_RP_RP2040` means every pin and driver is yours to declare — the Pro Micro RP2040 board default assumes a Sparkfun pinout that won't match your module.
 
 ### MCU-section review checklist — run before ordering
 
@@ -161,26 +161,64 @@ SERIAL_DRIVER = vendor        # PIO — free choice of GPIO; SIO is pin-locked
 
 ## 5. PCB architecture
 
-Three board designs, not two:
+**Four designs, but only one of them is hard.** The RP2040 subsystem is electrically *identical* on both halves, so it should be one board — not duplicated onto two large, asymmetric, separately-assembled mains.
 
-1. **Two distinct main PCBs — left and right.** The Hasukey layout (§0) is row-staggered and **asymmetric**: 32 keys left, 37 right, with a different shape on every row. A reversible mirrored PCB is impossible here. This is the single biggest cost of the chosen layout — two schematics, two layouts, two sets of gerbers, two PCBA setups. Panelise both designs in one JLCPCB order to claw back some of it.
-2. **Knob module: display variant.** GC9A01 + EC11 + connector.
-3. **Knob module: trackpad variant.** Cirque FFC connector + EC11 + connector.
+| # | Board | Designs | Assembly | Role |
+|---|---|---|---|---|
+| 1 | **Controller module** | **1**, shared by both halves | **JLCPCB PCBA** | RP2040 subsystem (§4), USB-C, TRRS, two FFC connectors |
+| 2 | Main PCB, left | 1 | hand-soldered | 32 keys: switches, hot-swap sockets, diodes, one FFC |
+| 3 | Main PCB, right | 1 | hand-soldered | 37 keys, same construction |
+| 4 | Knob module | 2 variants | hand-soldered | Encoder + GC9A01, or encoder + Cirque |
 
-Both modules present the *same* 10-pin JST/FFC interface to the main PCB (power, ground, SPI bus, two chip selects or DC/RST, encoder A/B). This is the key move: the knob assembly is the part most likely to need three revisions, and this way you respin a $5 module instead of the whole board.
+What this buys, versus putting the RP2040 on each main PCB:
 
-### Pin budget — verify this first, it's the hard constraint
+- **One assembled design instead of two.** One PCBA setup, one BOM, one stencil.
+- **A cheap respin.** An error in the MCU subsystem costs one small board, not two large ones. Phase 4.5 catches such an error early, but only this makes fixing it cheap.
+- **The big boards need no assembly service at all** — they become switches, diodes and a connector.
+- **USB-C and TRRS go where you want them**, since the module isn't tied to the knob pod.
 
-| | Left | Right |
-|---|---|---|
-| Matrix (5×7 left, 5×8 right) | 12 | 13 |
-| Encoder A/B/switch | 3 | 3 |
-| Display SPI (SCK, MOSI, CS, DC, RST, BL) | 6 | — |
-| Cirque (I²C SDA/SCL + DR interrupt) | — | 3 |
-| Split serial | 1 | 1 |
-| **Total** | **22** | **20** |
+The cost is one extra board-to-board cable per half, and display SPI now crossing a ribbon rather than running point-to-point. Both are covered below.
 
-A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI are on dedicated pins and cost nothing from that budget. Left fits with eight to spare. Going bare turns this from the project's tightest constraint into a non-issue — spend some of the slack on per-key RGB, a second encoder, or the handedness pin below.
+### Why the Cirque runs on SPI, not I²C
+
+So that **one knob-connector pinout serves both variants**. On I²C the two variants would need different signals on the same physical pins, and RP2040's fixed function map makes that awkward. On SPI they share a bus:
+
+| Variant | Uses |
+|---|---|
+| GC9A01 display | SCK, MOSI, CS, + D0 as DC, D1 as RST, D2 as backlight |
+| Cirque (`cirque_pinnacle_spi`) | SCK, MOSI, MISO, CS, + D0 as data-ready |
+
+One connector, one cable part number, two populations.
+
+### Interfaces
+
+**Controller → main PCB, 16-pin FFC.** Matrix plus handedness plus power:
+
+| Lines | |
+|---|---|
+| 13 | matrix — 5 rows + 8 columns (left uses 7 columns and leaves one idle) |
+| 1 | handedness — pulled to 3V3 on the left main PCB, to GND on the right |
+| 2 | 3V3, GND |
+
+Handedness moves to the *main* PCB precisely because the controller is now identical on both sides. It stays hardwired, so there is still nothing to jumper and nothing to lose on an EEPROM reset.
+
+**Controller → knob module, 12-pin FFC.** SCK, MOSI, MISO, CS, D0, D1, D2, ENC_A, ENC_B, 3V3, GND, and one spare.
+
+**Ribbon-borne SPI** is the one real regression. Mitigate it: keep the cable short, use an FFC with ground returns between signals, and clock Quantum Painter conservatively — the GC9A01 is a 240×240 status display, not a video target. Confirm the achievable clock in Phase 1 over a representative cable, not on a breadboard jumper.
+
+### Pin budget — one controller must satisfy both halves
+
+Because the module is shared, it has to carry the union of what either side needs:
+
+| | Pins |
+|---|---|
+| Matrix (5 rows + 8 columns) | 13 |
+| Knob connector signals (SCK, MOSI, MISO, CS, D0, D1, D2, ENC_A, ENC_B) | 9 |
+| Split serial | 1 |
+| Handedness (read from the main PCB) | 1 |
+| **Total** | **24** |
+
+A bare RP2040 exposes **30 GPIO** (GPIO0–29); USB and QSPI sit on dedicated pins and cost nothing. **Six spare** — enough for per-key RGB or a second encoder later. Verify against real hardware in Phase 1 before layout.
 
 ### Split topology — two MCUs, and why it isn't a preference
 
@@ -200,14 +238,14 @@ SERIAL_DRIVER = vendor        # RP2040 PIO full-duplex
 // config.h
 #define SPLIT_POINTING_ENABLE
 #define POINTING_DEVICE_RIGHT
-#define SPLIT_HAND_PIN GPxx           // solder jumper: high = left
+#define SPLIT_HAND_PIN GPxx           // from main PCB: high = left
 ```
 
 **Decide the master half now — make it the left (display) half, and plug USB in there.** QMK's default is `MASTER_LEFT`, and everything a display wants to render (layer state, mods, WPM, caps) lives natively on the master. Putting the display on the *slave* means syncing each of those across the link (`SPLIT_LAYER_STATE_ENABLE`, `SPLIT_MODS_ENABLE`, …) and driving Quantum Painter from synced state — much less trodden ground than OLED-on-slave. The Cirque has the opposite property: it's explicitly supported on the slave via `SPLIT_POINTING_ENABLE` + `POINTING_DEVICE_RIGHT`. So with USB in the left, both peripherals sit on the half QMK makes easiest.
 
 USB-C stays on **both** halves regardless — with two MCUs you must be able to flash each independently — but left is the intended host connection.
 
-**Handedness.** Because the halves are now two distinct boards, this gets easier: hardwire `SPLIT_HAND_PIN` — tie it to 3V3 on the left PCB and to ground on the right, no jumper to set and nothing to get wrong. Avoids `EE_HANDS`, which needs a separate handedness write to each half at flash time and silently breaks after an EEPROM reset.
+**Handedness.** Hardwired on the **main** PCB — 3V3 on the left, GND on the right — and read by the shared controller over the FFC (§5). `SPLIT_HAND_PIN`, no jumper to set, nothing to lose on an EEPROM reset, and no `EE_HANDS` write needed per half at flash time.
 
 ---
 
@@ -231,6 +269,7 @@ Print-only, no electronics beyond a loose EC11 and the Cirque. Iterate ring diam
 **Exit:** a ring you like turning, and a dimensioned sketch the PCB can be designed around.
 
 ### Phase 3 — KiCad (weeks 5–9)
+Four designs, in this order: **controller module first** (it gates everything), then the two mains, then the knob variants.
 KiCad 9. Symbol/footprint libraries: `ceoloide/keyboard-parts.pretty` or `marbastlib`. Schematic → main PCB layout from the Ergogen output → two knob modules → DRC → export STEP for the case.
 **Exit:** fab-ready gerbers, reviewed against the §4 MCU checklist. Budget an extra 1–2 weeks over the module route for the MCU subsystem and the ground-pour discipline it demands.
 
@@ -238,12 +277,12 @@ KiCad 9. Symbol/footprint libraries: `ceoloide/keyboard-parts.pretty` or `marbas
 Parametric — FreeCAD, OpenSCAD, or build123d — driven by the same key positions. Two-piece tray mount, integrated or separate 1.5 mm plate, M3 heat-set inserts, tenting feet, USB-C and TRRS cutouts with real tolerance.
 **Exit:** printed test fit of the knob region and the USB-C cutout *before* ordering PCBs.
 
-### Phase 4.5 — MCU bring-up (weeks 10–11)
-Order the main PCBs with **JLCPCB assembling the MCU side only**. Before soldering a single switch: power one board, confirm it appears as `RPI-RP2` mass storage, flash a blink UF2, then flash QMK and confirm the matrix scan runs on jumpered pins. A board that doesn't enumerate here has cost you nothing but the spin.
-**Exit:** both main PCBs enumerate and accept QMK.
+### Phase 4.5 — Controller bring-up (weeks 10–11)
+Order the **controller modules alone and early** — they're small, so order ten. Before committing to the mains: power one, confirm it appears as `RPI-RP2` mass storage, flash a blink UF2, then flash QMK and confirm a matrix scan on jumpered FFC pins. This is the whole reason the MCU lives on its own board: a failure here costs one cheap spin, and the main PCBs haven't been ordered yet.
+**Exit:** a controller module that enumerates, accepts QMK, and scans a matrix over the FFC.
 
 ### Phase 5 — Fab and assembly (weeks 11–13)
-Knob modules stay 2-layer and hand-soldered. Order 3× of each. Build one half completely and test before touching the second.
+With a proven controller, order the two mains and the knob variants — all 2-layer, all hand-soldered, no assembly service. Build one half completely and test before touching the second.
 
 ### Phase 6 — Firmware productionization (weeks 13–15)
 Proper `keyboard.json`, QMK external userspace, Vial or VIA, QP fonts and images, encoder maps per layer, Cirque tuning (`POINTING_DEVICE_ROTATION_*`, circular scroll, tap-to-click, curved-overlay setting).
@@ -257,9 +296,11 @@ Build guide, BOM with part numbers, STLs, upstream the QMK keyboard definition i
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| RP2040 board fails to enumerate | Dead spin, ~2 weeks | Minimal-design-example diff + the §4 checklist; order the MCU section assembled and bring it up standalone (Phase 4.5) before populating anything else |
+| RP2040 module fails to enumerate | ~1 week, ~$15 | Minimal-design-example diff + the §4 checklist; the module is ordered alone and proven in Phase 4.5 before any main PCB is ordered |
+| Display SPI unreliable over the FFC | Glitchy or blank display | Short cable, ground returns between signals, conservative QP clock; qualify over a real cable in Phase 1, not a breadboard jumper |
+| Two board-to-board cables per half | More connectors to fail | Locking FFC connectors, strain relief designed into the case, spare cables ordered |
 | Hand-soldering the QFN-56 goes wrong | Dead board | Don't — JLCPCB PCBA the MCU side |
-| Matrix routing fragments the ground pour under the MCU | Flaky, hard-to-debug behaviour | MCU in a corner, no matrix traces through it; inspect the poured result. Escalate to 4 layers only if this genuinely can't be met. |
+| Matrix routing fragments the ground pour under the MCU | Flaky, hard-to-debug behaviour | Much easier now: the controller is a small dedicated board with no matrix on it at all. Keep its pour continuous and stitch the centre pad. |
 | LDO undersized for display + RGB | Brownout under load | Size from the Phase 1 measurement, not from a datasheet guess |
 | Bearing/metal detunes the Cirque | Redesign the right knob | Phase 2 bench test with the real ring |
 | Printed ring gear has too much backlash | Bad feel | Tune ratio and tooth profile in Phase 2; fallback is Option B or D |
@@ -276,8 +317,9 @@ split-keyboard/
 ├── docs/          plan, decision records, pinout, BOM, build guide
 ├── hardware/
 │   ├── layout/    KLE source of truth + parser + resolved coordinates
-│   ├── pcb-left/  left main PCB (KiCad)
-│   ├── pcb-right/ right main PCB (KiCad)
+│   ├── pcb-controller/  shared RP2040 module (KiCad) — build this first
+│   ├── pcb-main-left/   32-key main PCB
+│   ├── pcb-main-right/  37-key main PCB
 │   ├── pcb-knob-display/
 │   ├── pcb-knob-cirque/
 │   └── lib/       shared symbols + footprints
@@ -294,10 +336,14 @@ split-keyboard/
 |---|---|
 | Phase 1 dev boards, GC9A01, Cirque | ~$70 |
 | Filament, bearings, hardware | ~$40 |
-| Main PCBs, **two designs** ×5 each, 2-layer, MCU side assembled by JLCPCB | ~$190 |
-| Knob module PCBs ×10, 2-layer | ~$25 |
+| Controller modules ×10, small, 2-layer, assembled by JLCPCB | ~$90 |
+| Main PCBs, two designs ×5 each, 2-layer, **bare** | ~$70 |
+| Knob module PCBs, two variants ×10, 2-layer, bare | ~$25 |
+| FFC cables and connectors | ~$15 |
 | Switches, keycaps, sockets, diodes, encoders | ~$120 |
-| **Total, with one respin** | **~$500** |
+| **Total, with one respin** | **~$470** |
+
+A controller respin costs roughly $15 rather than a repeat of the $190 line the previous architecture carried.
 
 ---
 
