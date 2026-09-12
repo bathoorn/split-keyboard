@@ -129,7 +129,7 @@ Ring rides on a thin-section ball bearing (6806-2RS class) or a printed race. **
 
   And if you ever do want 4 layers here, the module is ~40 × 30 mm, where the upgrade costs a few dollars rather than the several-times premium a full keyboard half would carry. The architecture makes that a cheap option instead of a painful one.
 - **Assembly service, for this board only.** JLCPCB PCBA populates the controller module: RP2040, flash, crystal, LDO, USB-C, ESD and FFC connectors. Everything else in the project — switches, sockets, diodes, encoders, the knob peripherals, and the through-hole TRRS jack — is hand-soldered by you. Reflowing a 0.4 mm QFN-56 with a centre pad by hand is its own skill-acquisition project; this one board is where that's worth paying to avoid, and it overturns the "no assembly service" assumption in §10.
-- **Libraries:** the RP2040 symbol ships with KiCad 9. For a vetted footprint and a layout to crib from, use the official Raspberry Pi Pico KiCad files or `ncarandini/KiCad-RP-Pico`.
+- **Libraries:** the RP2040 symbol ships with KiCad 10. For a vetted footprint and a layout to crib from, use the official Raspberry Pi Pico KiCad files or `ncarandini/KiCad-RP-Pico`.
 
 ### Firmware deltas versus a stock controller board
 
@@ -303,7 +303,7 @@ Print-only, no electronics beyond a loose EC11 and the Cirque. Iterate ring diam
 
 ### Phase 3 — KiCad (weeks 5–9)
 Four designs, in this order: **controller module first** (it gates everything), then the two mains, then the knob variants.
-KiCad 9. Symbol/footprint libraries: `ceoloide/keyboard-parts.pretty` or `marbastlib`. Schematic → main PCB layout from the Ergogen output → two knob modules → DRC → export STEP for the case.
+KiCad 10. Symbol/footprint libraries: **marbastlib**, installed via KiCad PCM (see `docs/TOOLS.md` for the repository URL and its known gaps). Schematic → footprint placement from the KLE in `hardware/layout/` via `kicad-kbplacer` → DRC → export STEP for the case.
 **Exit:** fab-ready gerbers, reviewed against the §4 MCU checklist. Budget an extra 1–2 weeks over the module route for the MCU subsystem and the ground-pour discipline it demands.
 
 ### Phase 4 — Case CAD (weeks 8–10, overlapping)
