@@ -1,0 +1,159 @@
+# Case / PCB co-design workflow
+
+The case and the boards constrain each other, so neither can simply be
+"designed first". This is how the two proceed without deadlocking or
+silently drifting apart.
+
+---
+
+## 1. It is not one loop — it is three couplings, and only one is circular
+
+| Coupling | Direction | Why |
+|---|---|---|
+| Layout → main PCB outline, **and** layout → plate/case outline | **one-way, layout wins** | Key positions are frozen (PLAN.md §0). The main PCB edge and the case plate are both offsets of the *same* polygon. Neither can push back on the other. |
+| Knob mechanism → knob PCB **and** → pod cavity | **one-way, mechanism wins** | Bearing, ring and sensor stack are physical facts discovered in Phase 2. Board and cavity are both consequences of them. |
+| Controller PCB ↔ case cavity | **genuinely two-way** | The only real loop in the project. |
+
+Two of the three apparent circular dependencies dissolve once you notice the
+arrows point the same way. Resolve those by *ordering*, and spend the real
+effort on the one loop that remains.
+
+---
+
+## 2. The rule: push the uncertainty into the part with the most slack
+
+- **Main PCBs: zero slack.** Key positions fix the outline completely.
+- **Knob modules: little slack.** The mechanism fixes them.
+- **Controller: enormous slack.** Small, singular, nearly any rectangle will
+  do, and ~$15 to respin.
+
+So the controller absorbs the coupling. **Fix its envelope by decree, early
+and generously, and design inward.** Do not let the case negotiate with it.
+
+Current envelope: **50 × 35 mm, ≤ 10 mm above the PCB** (`interface.yaml`).
+The case guarantees that volume; the controller fits inside it. Neither side
+may reshape it without a version bump and a re-fit.
+
+---
+
+## 3. The controller paradox
+
+Phase 4.5 orders the controller **first**, to de-risk the MCU. But its
+outline depends on a case that does not exist yet. This is the user's
+question in its sharpest form, so it deserves a direct answer.
+
+**The circuit and the outline are separate problems.** The circuit must be
+validated early. The outline only has to be *good enough*. Fix a generous
+envelope, build the circuit inside it, order it, and accept that the first
+controller may be mechanically suboptimal. If the finished case wants a
+different shape, respin it — it is the cheapest board in the project, and by
+then the circuit is proven.
+
+**Never invert this.** Waiting for a finished case before validating the MCU
+trades a $15 risk for a six-week one.
+
+---
+
+## 4. Single source of truth: `hardware/interface.yaml`
+
+Both sides read it. Neither side owns it. It carries only what crosses the
+electrical/mechanical boundary — board outlines, datums, pod centres, the
+controller envelope, the z-stack, port positions, mounting holes, and the
+one measured `fit_clearance`.
+
+Anything living wholly inside one domain — trace widths, fillet radii — does
+not belong in it.
+
+---
+
+## 5. Exchange formats
+
+| Direction | Format | Notes |
+|---|---|---|
+| CAD → KiCad | **DXF** of board outline + mounting hole positions → `Edge.Cuts` | KiCad cannot usefully consume STEP as a *constraint*, only as decoration. |
+| KiCad → CAD | **STEP** of the populated board → imported read-only | This is the fit reference, and the only honest one, because it carries real component heights. |
+
+**Never redraw an outline by hand in the other tool.** Every instance of
+"I'll just trace it roughly" is a future interference you find after paying
+for PCBs.
+
+---
+
+## 6. Gates
+
+Each gate is a freeze. Work downstream of a gate assumes everything upstream
+of it is stable.
+
+| Gate | Frozen | Entry criteria | Unlocks |
+|---|---|---|---|
+| **G0** | Key layout | Phase 0 paper mockup passed with your hands on it | Main PCB outlines, plate outline |
+| **G1** | Knob mechanism | Phase 2 prototype: a ring you like turning, dimensioned | Knob PCB, pod cavity, knob z-stack |
+| **G2** | `interface.yaml` v1 | No `TODO` left in the file | Detailed case CAD, controller layout |
+| **G3** | Board outlines | Edge.Cuts final on all four designs | Case interior detailing against real geometry |
+| **G4** | Virtual fit | STEP assembly of all boards in the case shows no interference | Ordering PCBs |
+| **G5** | Physical fit | Printed coupons pass (§8) | Ordering everything else |
+
+G0 is passed. G1 is Phase 2. **G2 is the real milestone** — the `TODO`s in
+`interface.yaml` are the exact list of what still blocks it.
+
+---
+
+## 7. Change control after G2
+
+Any change to `interface.yaml`:
+
+1. Bump `version`, add a `changelog` line saying what and why.
+2. Re-run the virtual fit (G4).
+3. Re-print only the affected coupon.
+
+This costs minutes. Skipping it is precisely how a case and a PCB drift into
+a $200 mismatch nobody notices until assembly.
+
+---
+
+## 8. Print coupons, not cases
+
+A full case print is hours; a coupon is 15–30 minutes. Never validate a
+detail by printing the whole thing.
+
+| Coupon | Tests |
+|---|---|
+| **Pod** | Bearing seat, ring clearance and feel, sensor pocket depth, Cirque metal keep-out |
+| **Port** | USB-C and TRRS wall cutouts against real connectors |
+| **Switch** | 2×2 plate section: switch retention, hotswap clearance below PCB, one standoff |
+| **FFC** | Connector clearance and whether the service loop can actually be assembled by human hands |
+
+The FFC coupon is the one people skip and regret. A cable that fits in CAD
+but cannot be seated with fingers is still a failure.
+
+---
+
+## 9. Tolerance calibration
+
+Print **one** test strip of clearances (0.10–0.50 mm in 0.05 steps), measure
+what your printer and filament actually produce, and record the result as the
+single `fit_clearance` value in `interface.yaml`. Reference that value
+everywhere.
+
+Scattering hand-tuned clearances through the CAD makes the model
+unre-printable on a different printer, or after a filament change.
+
+---
+
+## 10. Z is the axis that gets forgotten
+
+X and Y are visible in every drawing you look at. Z is not, and it is where
+the interferences hide. `interface.yaml` tracks the whole stack explicitly:
+
+```
+case floor
+  └─ standoff                      TODO
+      └─ below-PCB clearance       2.5   (hotswap socket ~1.8 + diode + margin)
+          └─ main PCB              1.6
+              └─ plate gap         5.0   (plate top to PCB top, standard MX)
+                  └─ plate         1.5
+```
+
+The knob stack is **separate and taller** — ring, bearing and sensor — and is
+what actually sets the case height. It stays `TODO` until Phase 2 produces
+physical parts, which is why G1 gates the case detailing.

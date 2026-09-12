@@ -302,12 +302,12 @@ Print-only, no electronics beyond a loose EC11 and the Cirque. Iterate ring diam
 **Exit:** a ring you like turning, and a dimensioned sketch the PCB can be designed around.
 
 ### Phase 3 — KiCad (weeks 5–9)
-Four designs, in this order: **controller module first** (it gates everything), then the two mains, then the knob variants.
+Four designs, in this order: **controller module first** (it gates everything), then the two mains, then the knob variants. Case and PCB proceed against the shared contract in `hardware/interface.yaml` — see **`docs/WORKFLOW.md`** for the gates, the exchange formats, and why the controller's outline is fixed by decree rather than negotiated.
 KiCad 10. Symbol/footprint libraries: **marbastlib**, installed via KiCad PCM (see `docs/TOOLS.md` for the repository URL and its known gaps). Schematic → footprint placement from the KLE in `hardware/layout/` via `kicad-kbplacer` → DRC → export STEP for the case.
 **Exit:** fab-ready gerbers, reviewed against the §4 MCU checklist. Budget an extra 1–2 weeks over the module route for the MCU subsystem and the ground-pour discipline it demands.
 
 ### Phase 4 — Case CAD (weeks 8–10, overlapping)
-Parametric — FreeCAD, OpenSCAD, or build123d — driven by the same key positions. Two-piece tray mount, integrated or separate 1.5 mm plate, M3 heat-set inserts, tenting feet, USB-C and TRRS cutouts with real tolerance.
+Parametric — FreeCAD, OpenSCAD, or build123d — driven by the same key positions, and reading the same `hardware/interface.yaml` the boards do (`docs/WORKFLOW.md`). Two-piece tray mount, integrated or separate 1.5 mm plate, M3 heat-set inserts, tenting feet, USB-C and TRRS cutouts with real tolerance.
 **Exit:** printed test fit of the knob region and the USB-C cutout *before* ordering PCBs.
 
 ### Phase 4.5 — Controller bring-up (weeks 10–11)
@@ -349,8 +349,9 @@ Build guide, BOM with part numbers, STLs, upstream the QMK keyboard definition i
 
 ```
 split-keyboard/
-├── docs/          plan, decision records, pinout, BOM, build guide
+├── docs/          PLAN.md, WORKFLOW.md, TOOLS.md, BOM, build guide
 ├── hardware/
+│   ├── interface.yaml   case <-> PCB contract; see docs/WORKFLOW.md
 │   ├── layout/    KLE source of truth + parser + resolved coordinates
 │   ├── pcb-controller/  shared RP2040 module (KiCad) — build this first
 │   ├── pcb-main-left/   32-key main PCB

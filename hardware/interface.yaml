@@ -1,0 +1,103 @@
+# Interface contract between the PCB designs and the case CAD.
+#
+# Both sides READ this file. Neither side owns it. It carries only what
+# crosses the boundary between electrical and mechanical -- nothing that
+# lives wholly inside one of them.
+#
+# Changing anything here after gate G2 (see docs/WORKFLOW.md) means:
+# bump `version`, add a `changelog` line, re-run the virtual fit, and
+# re-print the affected coupon. That discipline is the whole point.
+
+version: 1
+units: mm
+key_unit: 19.05
+
+changelog:
+  - "v1 - initial contract. Values marked TODO are unresolved and block G2."
+
+# ---------------------------------------------------------------------------
+# Upstream truth. Derived, never hand-edited.
+# ---------------------------------------------------------------------------
+layout:
+  source: hardware/layout/hasukey-both.kle.json
+  resolved: hardware/layout/keys-resolved.json
+  pods: hardware/layout/pods.json
+  regenerate: "python3 hardware/layout/kle_parse.py && python3 hardware/layout/place.py"
+
+# Per-board datum = min corner of that half's (keys + pod) bounding box, in
+# the combined KLE frame. Every coordinate below is relative to its own
+# board datum, so the two halves never share a coordinate system.
+boards:
+  main_left:
+    datum_in_kle_frame: [0.0, 0.0]
+    extent: [188.24, 114.64]
+    key_count: 32
+    pod_centre: [165.74, 80.01]
+    ring_od: 45.0          # GC9A01 display ring
+    sensor_od: 33.0
+  main_right:
+    datum_in_kle_frame: [135.02, 0.0]
+    extent: [212.64, 114.64]
+    key_count: 37
+    pod_centre: [25.00, 80.01]
+    ring_od: 50.0          # Cirque TM035035 ring
+    sensor_od: 35.0
+
+# ---------------------------------------------------------------------------
+# Fixed by decree, not negotiated. See "push uncertainty into the part with
+# the most slack" in docs/WORKFLOW.md. The controller absorbs the coupling
+# because it is small, singular, and ~$15 to respin.
+# ---------------------------------------------------------------------------
+controller_envelope:
+  extent: [50.0, 35.0]
+  max_height_above_pcb: 10.0    # tallest part is the TRRS jack
+  pcb_thickness: 1.6
+  note: >
+    The case must guarantee this volume somewhere reachable by both FFCs.
+    The controller PCB must fit inside it. Neither side may shrink or
+    reshape this without a version bump and a re-fit.
+
+# ---------------------------------------------------------------------------
+# Z stack. The axis that gets forgotten until something does not close.
+# ---------------------------------------------------------------------------
+z_stack:
+  plate_thickness: 1.5
+  plate_top_to_pcb_top: 5.0     # standard MX
+  pcb_thickness: 1.6
+  below_pcb_clearance: 2.5      # hotswap socket ~1.8 + diode + margin
+  standoff_height: TODO
+  case_floor_to_plate_top: TODO
+  knob_stack: TODO              # ring + bearing + sensor; set at G1 from Phase 2
+
+# ---------------------------------------------------------------------------
+# Connectors and ports. Positions are case-wall coordinates, set at G2.
+# ---------------------------------------------------------------------------
+connectors:
+  main_ffc:  { pins: 20, pitch: 0.5, position: TODO }
+  knob_ffc:  { pins: 14, pitch: 0.5, position: TODO }
+  usb_c:     { position: TODO, cutout_clearance: TODO }
+  trrs:      { position: TODO, cutout_clearance: TODO }
+  service_loop: TODO            # slack length per cable, so assembly is possible
+
+mounting:
+  insert: M3 heat-set
+  hole_diameter: TODO           # after the tolerance coupon is measured
+  positions_main_left: TODO
+  positions_main_right: TODO
+  positions_controller: TODO
+
+# ---------------------------------------------------------------------------
+# One measured number, referenced everywhere. Never scatter magic clearances.
+# ---------------------------------------------------------------------------
+fit_clearance: TODO             # from the tolerance strip coupon, printer + filament specific
+
+# ---------------------------------------------------------------------------
+# Knob mechanism. All TODO until Phase 2 produces physical parts.
+# ---------------------------------------------------------------------------
+knob:
+  mechanism: "ring gear driving off-axis EC11 (PLAN.md section 2, option A)"
+  bearing: TODO                 # OD / ID / width
+  ring_od: TODO
+  ring_height: TODO
+  gear_ratio: TODO
+  cirque_metal_keepout: TODO    # capacitive; measured, not assumed
